@@ -13,7 +13,8 @@
 #include "DHTesp.h" // Click here to get the library: http://librarymanager/All#DHTesp
 #include <Wire.h>    // I2C library
 #include "ccs811.h"  // CCS811 library
-
+#include <TinyGPSPlus.h>
+#include <SoftwareSerial.h>
 /* ############################################################################################
   #                                   ERROR HANDLE                                           #
   ############################################################################################ */
@@ -31,7 +32,7 @@
 //Servidor host que volem accedir
 const char* ssid     = "Universitat d'Andorra";
 const char* password = "";
-const String host = "192.168.13.238"; //Adreça de la RaspBerryPi3 (Veure ServidorTest.py) // Ping RaspiR1 en CMD
+const String host = "192.168.13.153"; //Adreça de la RaspBerryPi3 (Veure ServidorTest.py) // Ping RaspiR1 en CMD
 
 /* ############################################################################################
    #                                   VARIABLES                                              #
@@ -55,9 +56,18 @@ String dada6 = "&Switch2=";
 // Polsadors (VEX, part mecanitzada)
 int Switch1 = 0;
 int Switch2 = 0;
-int button1 = 0;
+int button1 = 2;
 int button2 = 0;
 int temporal = 0; 	 // variable temporal para el estatus del botón.
+int temporal2 = 0;
+
+TinyGPSPlus gps;  // The TinyGPS++ object
+#define rxGPS 14
+#define txGPS 12
+static const uint32_t GPSBaud = 9600;//9600
+
+// The serial connection to the GPS device
+SoftwareSerial ss(rxGPS, txGPS);
 
 /* ############################################################################################
    #                                        SETUP                                             #
@@ -93,9 +103,9 @@ void setup()
      #                           Preprar pins DHT ESP8266                                       #
      ############################################################################################ */
 
-  dht.setup(14,DHTesp::DHT11); //Pin sensor conectat a D1
-  pinMode(14, OUTPUT); //
-  digitalWrite(14, LOW);
+  dht.setup(16,DHTesp::DHT11); //Pin sensor conectat a D1
+  pinMode(16, OUTPUT); //
+  digitalWrite(16, LOW);
 
   /* ############################################################################################
      #                         Preprar sensor CO2 (CSS811) + I2C WIRING                         #
@@ -124,6 +134,21 @@ void setup()
      ############################################################################################ */
 
   pinMode(button1, INPUT); // declare push button as input
+  pinMode(button2, INPUT); // declare push button as input
+
+  /* ############################################################################################
+     #                           Preprar GPS                                                    #
+     ############################################################################################ */
+
+  Serial.println();
+  ss.begin(GPSBaud);
+  delay(1000);
+  Serial.println(F("TestGPS.ino"));
+  Serial.println(F("Demo de TinyGPSPlus ....."));
+  Serial.print(F("Provant TinyGPSPlus versió : ")); Serial.println(TinyGPSPlus::libraryVersion());
+  Serial.println(F("Agraiments a Mikal Hart"));
+  Serial.println();
+  
 }
 
 /* ############################################################################################
@@ -182,18 +207,44 @@ void loop()
   // #######################################  BOTONS VEX A ARDUINO #######################################
 
   temporal = digitalRead(button1);
+  temporal2 = digitalRead(button2);
      
   if (temporal == HIGH) 
   {
-    Serial.println("LED OFF");
+    Serial.println("LED1 OFF");
     Switch1 = 0;
   }
   else 
   {
-    Serial.println("LED ON");
+    Serial.println("LED1 ON");
     Switch1 = 1;
   }
   Serial.println();
+
+  if (temporal2 == HIGH) 
+  {
+    Serial.println("LED2 OFF");
+    Switch2 = 0;
+  }
+  else 
+  {
+    Serial.println("LED2 ON");
+    Switch2 = 1;
+  }
+  Serial.println();
+
+  // #######################################  PART GPS #######################################
+
+  while (ss.available() > 0)
+    if (gps.encode(ss.read()))
+      displayInfo();
+
+  if (millis() > 5000 && gps.charsProcessed() < 10)
+  {
+    Serial.println(F("No es detecta el GPS : verifica els cables SUP"));
+    //while(true);
+  }
+
 
   // ######################################## LOOP Pujar dades Servidor ####################################### 
     
@@ -202,7 +253,7 @@ void loop()
   if (!client.connect(host,httPort)) 
   {
   Serial.println("Error en connexió Servidor caigut");
-  delay(2000);
+  // delay(2000);
   return;
   }
 
@@ -237,5 +288,58 @@ void loop()
   //Enviar una lectura cada X milisegons aprox. (EL REPTE DEMANA CADA 15s però està a 2 per generar dades pel tests amb sql i estadística)
   Serial.println();                
   Serial.println("Tancant connexió");     
-  delay(2000);            //Enviar una lectura cada X milisegons aprox. (EL REPTE DEMANA CADA 15s però està a 2 per generar dades pel tests amb sql i estadística)
+  delay(10);            //Enviar una lectura cada X milisegons aprox. (EL REPTE DEMANA CADA 15s però està a 2 per generar dades pel tests amb sql i estadística)
+}
+
+void displayInfo()
+{
+  Serial.print(F("Posició GPS: ")); 
+  if (gps.location.isValid())
+  {
+    Serial.print(gps.location.lat(), 6);
+    Serial.print(F(","));
+    Serial.print(gps.location.lng(), 6);
+    
+  }
+  else
+  {
+    Serial.print(F("INVALID, Encara no rebo dades del satèl·lit...."));
+  }
+
+  Serial.print(F("  Data/Hora: "));
+  if (gps.date.isValid())
+  {
+    Serial.print(gps.date.month());
+    Serial.print(F("/"));
+    Serial.print(gps.date.day());
+    Serial.print(F("/"));
+    Serial.print(gps.date.year());
+  }
+  else
+  {
+    Serial.print(F("INVALID Data"));
+  }
+
+  Serial.print(F(" "));
+  if (gps.time.isValid())
+  {
+    int hora=gps.time.hour()+2;
+    if (hora < 10) Serial.print(F("0"));
+    Serial.print(hora);
+    Serial.print(F(":"));
+    if (gps.time.minute() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.minute());
+    Serial.print(F(":"));
+    if (gps.time.second() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.second());
+    Serial.print(F("."));
+    if (gps.time.centisecond() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.centisecond());
+  }
+  else
+  {
+    Serial.print(F("INVALID Hora"));
+  }
+
+  Serial.println();
 }
