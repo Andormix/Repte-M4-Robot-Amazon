@@ -140,12 +140,8 @@ int main()
     wait(0.3,sec);
   }
 
-  /*// Por un bug
-  while(true)
-  {
-    Motor20.spin(reverse);
-    Drivetrain.stop();
-  }*/
-  
-  // wait(100,msec);
+  Drivetrain.stop();
+  Motor20.spin(reverse);
+  wait(40,sec);
+  Motor20.stop();
 }
