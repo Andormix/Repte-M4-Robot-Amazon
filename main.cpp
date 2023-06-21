@@ -20,15 +20,22 @@
 
 using namespace vex;
 
-// Numero de mm del tramo.
-float rectas[] = {(800+220), (1600-220), (800-220)}; // 1000mm = 100 cm = 1m Bravo eric
-// Valores boleanos, True = Giro Derecha III False = Giro izquierda  (Giros de 90º)
-bool curvas[] ={1,1}; 
-//Numero de rectas
-int num_rect = sizeof(rectas);
-int num_curv = sizeof(curvas);
+// Para que quede centrado desde la pos inicial
+const int offset = 260; 
+
+// Numero de mm del tramo (1000mm = 100 cm = 1m )
+float rectas[] = {(2000 + offset)}; 
+
+// True (1) = Giro Derecha and False = Giro izquierda  (Giros de 90º) 
+bool curvas[] ={};  
+
+// Numero de rectas y curvas por hacer
+int num_rect = sizeof(rectas) / sizeof(int);
+int num_curv = sizeof(curvas) / sizeof(bool);
+
 // Variable temporal control recorrido total (linea recta)
 int acumulador = 0;
+
 // Control de casos línite
 int dist_por_recorrer = 0;
 
@@ -36,17 +43,23 @@ int main()
 {
   vexcodeInit();
   Drivetrain.setHeading(0, degrees);
-  wait(3,sec);
+  wait(1,sec);
 
-  for(int i = 0; i < (num_rect - 1) ; i++)
+  // Testing
+  printf("tenemos %i rectas por hacer.\n", num_rect);
+  printf("tenemos %i curvas por hacer.\n", num_curv);
+  
+  for(int i = 0; i < (num_rect); i++)
   {
     // reset variable temporal control recorrido total (linea recta)
     acumulador = 0;
 
-    // Avanza 
+    // Testing
+    printf("Recta no. %i\n" , i);
+
+    // AVANÇAR
     while(acumulador < rectas[i])
     {
-
       // Variable que almacena cuanto falta por recorrer
       dist_por_recorrer = rectas[i] - acumulador;
 
@@ -54,74 +67,85 @@ int main()
       if (dist_por_recorrer >= 100)
       {
         Drivetrain.driveFor(reverse, 100, mm);
+        Drivetrain.turnToHeading(0,degrees); // Corrige desviación
         acumulador += 100;
       }
-      else // Si la dist es menor a un giro de rueda, gura lo que falte
+      else // Si la dist es menor a un giro de rueda, gira lo que falte
       {
         Drivetrain.driveFor(reverse, dist_por_recorrer, mm);
+        Drivetrain.turnToHeading(0,degrees); // Corrige desviación
         break;
       } 
 
       // Si detecta un objecte
       if(Distance11.isObjectDetected())
       {
-        wait(0.3, sec); // Bug
         // Si l'objecte està a prop
         if(Distance11.objectDistance(mm) < 250 && Distance11.objectDistance(mm) > 100)
         {
-
           //Inicia sequancia rodeo
           Motor20.spin(forward);
-          Drivetrain.turnToHeading(90,degrees);; // Gira derecha
+          Drivetrain.turnToHeading(90,degrees); // Gira derecha
           Drivetrain.setHeading(0,degrees);
+
           Drivetrain.driveFor(reverse, 700, mm); // Lateraliza hacia la derecha
+          Drivetrain.turnToHeading(0,degrees); // Corrige desviación
+
           Drivetrain.turnToHeading(-90,degrees);; // Gira izquierda
           Drivetrain.setHeading(0,degrees);
+
           Drivetrain.driveFor(reverse, 1100, mm); // Linea recta 
-          // AQUI HAY UN CASO LÍMITE POR VALORAR
+          Drivetrain.turnToHeading(0,degrees); // Corrige desviación
+
           Drivetrain.turnToHeading(-90,degrees);; // Gira izquierda
           Drivetrain.setHeading(0,degrees);
+
           Drivetrain.driveFor(reverse, 700, mm); // Lateraliza hacia la izquierda
+          Drivetrain.turnToHeading(0,degrees); // Corrige desviación
+
           Drivetrain.turnToHeading(90,degrees);; // Gira derecha
           Drivetrain.setHeading(0,degrees);
           Motor20.stop();
 
           // Actualiza distancia recorrida
-          acumulador += 1000;
-          
+          acumulador += 1100;
+               
         }
       }
     }
 
-    // CAS LÍMIT CUB EN UNA PUNTA
+    // CORREGIR (CAS LÍMIT CUB EN UNA PUNTA DE LA RECTA)
     if(acumulador > rectas[i])
     {
+      // Retrocedeix la distància que ha fet de més-
       Drivetrain.driveFor(forward, (acumulador - rectas[i]), mm);
     }
 
-    // Gira
+    // GIRAR
     if(i < num_curv)
-    {     
+    { 
       if (curvas[i] == 1)
       {
         Drivetrain.turnToHeading(90,degrees);
       }
       
-      if(curvas[1] == 0)
+      if(curvas[i] == 0)
       {
         Drivetrain.turnToHeading(-90,degrees); // Gira izquierda
       }
+
+      Drivetrain.setHeading(0,degrees);
     }
-    Drivetrain.setHeading(0,degrees);
-    wait(1,sec);
+
+    wait(0.3,sec);
   }
 
-  // Por un bug
+  /*// Por un bug
   while(true)
   {
     Motor20.spin(reverse);
     Drivetrain.stop();
-  }
+  }*/
   
-  wait(100,msec);
+  // wait(100,msec);
 }
